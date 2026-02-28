@@ -1,0 +1,21 @@
+# Binary
+ascii_particles
+
+# Research notes (not part of the project)
+RESEARCH.md
+
+# Odin build artifacts
+*.o
+*.obj
+*.pdb
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor state
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
