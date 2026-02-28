@@ -12,6 +12,7 @@ Particle_Behavior :: enum {
 	Gravity, // sparks/blood: downward acceleration
 	Wobble,  // wind: sine wave on vel_y
 	Spread,  // smoke: widens horizontal drift over lifetime
+	Drag,    // frost/magic: exponential deceleration, particles slow to a stop
 }
 
 Particle :: struct {
@@ -34,6 +35,10 @@ Emitter_Type :: enum {
 	Wind,
 	Smoke,
 	Blood,
+	Lightning,
+	Frost,
+	Dust,
+	Magic,
 }
 
 // --- Pool ---
@@ -47,6 +52,8 @@ Particle_Pool :: struct {
 }
 
 init_pool :: proc(pool: ^Particle_Pool) {
+	// Zero all particles first — prevents double-free if called mid-simulation
+	pool.particles = {}
 	// Push all indices onto the free list (reverse order so index 0 is popped first)
 	for i in 0 ..< MAX_PARTICLES {
 		pool.free_list[i] = i32(MAX_PARTICLES - 1 - i)
@@ -111,6 +118,7 @@ Emitter :: struct {
 	active:        bool,
 	one_shot:      bool, // deactivate after first burst
 	burst_count:   i32,  // how many to spawn in a one-shot burst
+	inward:        bool, // spawn velocity points toward emitter center
 }
 
 update_emitter :: proc(emitter: ^Emitter, pool: ^Particle_Pool, dt: f32) {
@@ -135,10 +143,26 @@ spawn_from_emitter :: proc(emitter: ^Emitter, pool: ^Particle_Pool) {
 	p, _, ok := alloc_particle(pool)
 	if !ok do return
 
-	p.pos.x = emitter.pos.x + rand_range(-emitter.area.x * 0.5, emitter.area.x * 0.5)
-	p.pos.y = emitter.pos.y + rand_range(-emitter.area.y * 0.5, emitter.area.y * 0.5)
-	p.vel.x = rand_range(emitter.vel_min.x, emitter.vel_max.x)
-	p.vel.y = rand_range(emitter.vel_min.y, emitter.vel_max.y)
+	offset_x := rand_range(-emitter.area.x * 0.5, emitter.area.x * 0.5)
+	offset_y := rand_range(-emitter.area.y * 0.5, emitter.area.y * 0.5)
+	p.pos.x = emitter.pos.x + offset_x
+	p.pos.y = emitter.pos.y + offset_y
+
+	if emitter.inward {
+		// Velocity points from spawn position back toward emitter center
+		speed := rand_range(
+			math.sqrt(emitter.vel_min.x * emitter.vel_min.x + emitter.vel_min.y * emitter.vel_min.y),
+			math.sqrt(emitter.vel_max.x * emitter.vel_max.x + emitter.vel_max.y * emitter.vel_max.y),
+		)
+		dist := math.sqrt(offset_x * offset_x + offset_y * offset_y)
+		if dist > 0.1 {
+			p.vel.x = (-offset_x / dist) * speed
+			p.vel.y = (-offset_y / dist) * speed
+		}
+	} else {
+		p.vel.x = rand_range(emitter.vel_min.x, emitter.vel_max.x)
+		p.vel.y = rand_range(emitter.vel_min.y, emitter.vel_max.y)
+	}
 	p.lifetime = rand_range(emitter.lifetime_min, emitter.lifetime_max)
 	p.max_life = p.lifetime
 	p.char = emitter.char_variants[rand.int31() % emitter.char_count]
@@ -174,6 +198,10 @@ update_particles :: proc(pool: ^Particle_Pool, dt: f32) {
 		case .Spread:
 			age := 1.0 - (p.lifetime / p.max_life)
 			p.vel.x += rand_range(-60, 60) * age * dt // wider drift as particle ages
+		case .Drag:
+			// Exponential deceleration — particles slow to a stop
+			damping := math.pow(f32(0.04), dt) // ~96% velocity loss per second
+			p.vel *= damping
 		case .None:
 		// nothing
 		}
