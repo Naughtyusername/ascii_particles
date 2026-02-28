@@ -11,6 +11,7 @@ Particle_Behavior :: enum {
 	Flicker, // fire: random vel_x jitter each frame
 	Gravity, // sparks/blood: downward acceleration
 	Wobble,  // wind: sine wave on vel_y
+	Spread,  // smoke: widens horizontal drift over lifetime
 }
 
 Particle :: struct {
@@ -24,6 +25,15 @@ Particle :: struct {
 	font_size: i32,
 	alive:     bool,
 	behavior:  Particle_Behavior,
+}
+
+Emitter_Type :: enum {
+	Fire,
+	Sparks,
+	Rain,
+	Wind,
+	Smoke,
+	Blood,
 }
 
 // --- Pool ---
@@ -161,6 +171,9 @@ update_particles :: proc(pool: ^Particle_Pool, dt: f32) {
 		case .Wobble:
 			age := 1.0 - (p.lifetime / p.max_life)
 			p.vel.y += math.sin(age * 12) * 30 * dt
+		case .Spread:
+			age := 1.0 - (p.lifetime / p.max_life)
+			p.vel.x += rand_range(-60, 60) * age * dt // wider drift as particle ages
 		case .None:
 		// nothing
 		}

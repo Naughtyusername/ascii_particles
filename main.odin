@@ -5,6 +5,7 @@ import rl "vendor:raylib"
 
 pool: Particle_Pool
 emitters: [MAX_EMITTERS]Emitter
+selected: Emitter_Type
 show_debug: bool
 
 main :: proc() {
@@ -18,32 +19,36 @@ main :: proc() {
 		dt := rl.GetFrameTime()
 		mouse := rl.GetMousePosition()
 
-		// --- Input ---
+		// --- Input: type selection ---
 
-		// Left click: spawn continuous fire emitter in next free slot
+		if rl.IsKeyPressed(.ONE)   do selected = .Fire
+		if rl.IsKeyPressed(.TWO)   do selected = .Sparks
+		if rl.IsKeyPressed(.THREE) do selected = .Rain
+		if rl.IsKeyPressed(.FOUR)  do selected = .Wind
+		if rl.IsKeyPressed(.FIVE)  do selected = .Smoke
+		if rl.IsKeyPressed(.SIX)   do selected = .Blood
+
+		// Left click: spawn continuous emitter
 		if rl.IsMouseButtonPressed(.LEFT) {
 			for &e in emitters {
 				if !e.active {
-					e = make_fire_emitter(mouse.x, mouse.y)
+					e = spawn_emitter_at(mouse.x, mouse.y, selected, false)
 					break
 				}
 			}
 		}
 
-		// Right click: one-shot fire burst
+		// Right click: one-shot burst
 		if rl.IsMouseButtonPressed(.RIGHT) {
 			for &e in emitters {
 				if !e.active {
-					e = make_fire_emitter(mouse.x, mouse.y)
-					e.one_shot = true
-					e.burst_count = 40
-					e.spawn_rate = 0 // irrelevant for one-shot
+					e = spawn_emitter_at(mouse.x, mouse.y, selected, true)
 					break
 				}
 			}
 		}
 
-		// Space: kill all particles and emitters
+		// Space: clear everything
 		if rl.IsKeyPressed(.SPACE) {
 			init_pool(&pool)
 			emitters = {}
@@ -66,29 +71,23 @@ main :: proc() {
 		rl.BeginDrawing()
 		rl.ClearBackground({20, 18, 24, 255})
 
-		// Optional atmosphere grid
+		// Debug atmosphere grid
 		if show_debug {
 			for ty in 0 ..< 34 {
 				for tx in 0 ..< 60 {
 					ch: cstring = (tx + ty) % 7 == 0 ? "#" : "."
-					rl.DrawText(
-						ch,
-						i32(tx) * 20 + 10, i32(ty) * 20 + 40,
-						16,
-						{40, 38, 44, 100},
-					)
+					rl.DrawText(ch, i32(tx) * 20 + 10, i32(ty) * 20 + 40, 16, {40, 38, 44, 100})
 				}
 			}
 		}
 
 		draw_particles(&pool)
 
-		// HUD
+		// HUD - top
 		rl.DrawText(
-			fmt.ctprintf("Particles: %d  FPS: %d", active_count(&pool), rl.GetFPS()),
+			fmt.ctprintf("Particles: %d  FPS: %d  [%s]", active_count(&pool), rl.GetFPS(), emitter_type_name(selected)),
 			10, 10, 20, rl.RAYWHITE,
 		)
-		rl.DrawText("LClick: fire  RClick: burst  Space: clear  Tab: grid", 10, 656, 16, {150, 150, 150, 200})
 
 		if show_debug {
 			rl.DrawText(
@@ -96,6 +95,12 @@ main :: proc() {
 				10, 34, 16, {100, 200, 100, 200},
 			)
 		}
+
+		// HUD - bottom controls
+		rl.DrawText(
+			"1:Fire  2:Sparks  3:Rain  4:Wind  5:Smoke  6:Blood  |  LClick:spawn  RClick:burst  Space:clear  Tab:debug",
+			10, 656, 14, {150, 150, 150, 200},
+		)
 
 		rl.EndDrawing()
 	}
