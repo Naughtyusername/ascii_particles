@@ -211,7 +211,7 @@ update_particles :: proc(pool: ^Particle_Pool, dt: f32) {
 	}
 }
 
-draw_particles :: proc(pool: ^Particle_Pool) {
+draw_particles :: proc(pool: ^Particle_Pool, offset: [2]i32 = {0, 0}) {
 	for i in 0 ..< MAX_PARTICLES {
 		p := &pool.particles[i]
 		if !p.alive do continue
@@ -221,7 +221,7 @@ draw_particles :: proc(pool: ^Particle_Pool) {
 		col := lerp_color(p.color, p.color_end, age_ratio)
 		col.a = u8(f32(col.a) * (1.0 - age_ratio * age_ratio)) // quadratic fade on top
 
-		rl.DrawText(p.char, i32(p.pos.x), i32(p.pos.y), p.font_size, col)
+		rl.DrawText(p.char, i32(p.pos.x) + offset.x, i32(p.pos.y) + offset.y, p.font_size, col)
 	}
 }
 
